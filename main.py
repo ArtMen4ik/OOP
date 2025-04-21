@@ -4,23 +4,50 @@ from collections import defaultdict
 # ==================== Задание 1: Обработка исключений ====================
 class StudioBaseError(Exception):
     """Базовое исключение для фотостудии"""
-    pass
+    def __init__(self, message="Произошла ошибка в работе фотостудии"):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f"Ошибка фотостудии: {self.message}"
+
 
 class ClientError(StudioBaseError):
     """Ошибка, связанная с клиентом"""
-    pass
+    def __init__(self, client_info, message="Ошибка с клиентом"):
+        self.client_info = client_info
+        full_message = f"{message} (клиент: {client_info})"
+        super().__init__(full_message)
+
 
 class ClientNotFoundError(ClientError):
     """Клиент не найден"""
-    pass
+    def __init__(self, client_name, search_context=""):
+        message = f"Клиент '{client_name}' не найден"
+        if search_context:
+            message += f" при {search_context}"
+        super().__init__(client_name, message)
+
 
 class BookingError(StudioBaseError):
     """Ошибка бронирования"""
-    pass
+    def __init__(self, booking_details, message="Ошибка бронирования"):
+        self.booking_details = booking_details
+        full_message = f"{message}: {booking_details}"
+        super().__init__(full_message)
+
 
 class HallNotAvailableError(BookingError):
     """Зал недоступен"""
-    pass
+    def __init__(self, hall_number, date, time, reason=""):
+        details = f"Зал {hall_number} недоступен {date} в {time}"
+        if reason:
+            details += f" (причина: {reason})"
+        super().__init__(details, "Ошибка доступности зала")
+        self.hall_number = hall_number
+        self.date = date
+        self.time = time
+
 
 # ==================== Базовые классы ====================
 class PhotographicEntity(ABC):
@@ -174,7 +201,7 @@ class Studio:
                 raise BookingError("Неверный формат телефона клиента")
                 
             if not self._is_hall_available(booking.hall, booking.date, booking.time):
-                raise HallNotAvailableError(f"Зал {booking.hall.number} уже занят в это время")
+                raise HallNotAvailableError(booking.hall.number, booking.date, booking.time, "уже занят")
                 
             self.bookings_by_date[booking.date].append(booking)
             Studio.total_bookings += 1
@@ -206,7 +233,7 @@ class Studio:
                     Studio.total_bookings -= (original_count - len(self.bookings_by_date[date]))
             
             if not found:
-                raise ClientNotFoundError(f"Клиент {client_name} не найден")
+                raise ClientNotFoundError(client_name, "отмене бронирования")
                 
             print(f"Бронирование клиента {client_name} удалено.")
             

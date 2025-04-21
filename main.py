@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 
 # ==================== Задание 1: Обработка исключений ====================
-class StudioBaseError(BaseException):
+class StudioBaseError(Exception):
     """Базовое исключение для фотостудии"""
     pass
 

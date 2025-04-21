@@ -6,12 +6,16 @@ class StudioBaseError(Exception):
     """Базовое исключение для фотостудии"""
     pass
 
-class BookingError(StudioBaseError):
-    """Ошибка бронирования"""
+class ClientError(StudioBaseError):
+    """Ошибка, связанная с клиентом"""
     pass
 
-class ClientNotFoundError(BookingError):
+class ClientNotFoundError(ClientError):
     """Клиент не найден"""
+    pass
+
+class BookingError(StudioBaseError):
+    """Ошибка бронирования"""
     pass
 
 class HallNotAvailableError(BookingError):

@@ -1,12 +1,25 @@
+import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from datetime import datetime
+from typing import List, Dict, Callable
 
-# ==================== Задание 1: Обработка исключений ====================
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    filename='photo_studio.log',
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    encoding='utf-8'
+)
+logger = logging.getLogger('PhotoStudio')
+
+# ==================== Базовые классы и исключения ====================
 class StudioBaseError(Exception):
     """Базовое исключение для фотостудии"""
     def __init__(self, message="Произошла ошибка в работе фотостудии"):
         self.message = message
         super().__init__(self.message)
+        logger.error(f"StudioBaseError: {message}")
 
     def __str__(self):
         return f"Ошибка фотостудии: {self.message}"
@@ -20,330 +33,231 @@ class ClientError(StudioBaseError):
         super().__init__(full_message)
 
 
-class ClientNotFoundError(ClientError):
-    """Клиент не найден"""
-    def __init__(self, client_name, search_context=""):
-        message = f"Клиент '{client_name}' не найден"
-        if search_context:
-            message += f" при {search_context}"
-        super().__init__(client_name, message)
-
-
-class BookingError(StudioBaseError):
-    """Ошибка бронирования"""
-    def __init__(self, booking_details, message="Ошибка бронирования"):
-        self.booking_details = booking_details
-        full_message = f"{message}: {booking_details}"
-        super().__init__(full_message)
-
-
-class HallNotAvailableError(BookingError):
-    """Зал недоступен"""
-    def __init__(self, hall_number, date, time, reason=""):
-        details = f"Зал {hall_number} недоступен {date} в {time}"
-        if reason:
-            details += f" (причина: {reason})"
-        super().__init__(details, "Ошибка доступности зала")
-        self.hall_number = hall_number
-        self.date = date
-        self.time = time
-
-
-# ==================== Базовые классы ====================
 class PhotographicEntity(ABC):
     """Абстрактный класс для сущностей фотостудии"""
     
     @abstractmethod
-    def get_info(self):
+    def get_info(self) -> str:
         """Абстрактный метод для получения информации об объекте"""
+        pass
+
+    @abstractmethod
+    def calculate_cost(self, hours: int) -> float:
+        """Абстрактный метод для расчета стоимости"""
         pass
 
     def __str__(self):
         return self.get_info()
 
-    def __repr__(self):
-        """Задание 6: Строковое представление для воссоздания объекта"""
-        attrs = ", ".join(f"{k}={repr(v)}" for k, v in self.__dict__.items())
-        return f"{self.__class__.__name__}({attrs})"
 
-
-# ==================== Задание 3: Наследование ====================
+# ==================== Классы сущностей с полиморфизмом ====================
 class Person(PhotographicEntity):
     """Базовый класс для персон"""
-    def __init__(self, fname, lname):
-        self._fname = fname  # Задание 4: Защищенный атрибут
+    def __init__(self, fname: str, lname: str):
+        self._fname = fname
         self._lname = lname
+        logger.info(f"Создан объект Person: {fname} {lname}")
         
-    def get_info(self):
+    def get_info(self) -> str:
         return f"{self._fname} {self._lname}"
         
-    def greet(self):
-        return f"Привет, я {self._fname}!"
+    def calculate_cost(self, hours: int) -> float:
+        return 0  # Базовая персона не имеет стоимости
 
 
 class Client(Person):
-    """Клиент фотостудии (производный класс от Person)"""
-    
-    def __init__(self, fname, lname, phone):
-        super().__init__(fname, lname)  # Задание 5: Вызов конструктора базового класса
+    """Клиент фотостудии"""
+    def __init__(self, fname: str, lname: str, phone: str):
+        super().__init__(fname, lname)
         self.phone = phone
-        self._discount = 0  # Задание 4: Защищенный атрибут
-
-    # Переопределение метода базового класса
-    def get_info(self):
-        return f"{super().get_info()}, Телефон: {self.phone}"
+        self._discount = 0
+        logger.info(f"Создан клиент: {fname} {lname}, телефон: {phone}")
         
-    # Задание 3: Метод, использующий и базовый, и переопределенный методы
-    def full_greeting(self, is_vip=False):
-        if is_vip:
-            return f"{super().greet()} Я VIP-клиент! Мой телефон: {self.phone}"
-        else:
-            return f"{self.get_info()} - обычный клиент"
-
-    def validate_phone(self):
-        """Пример обработки строк: валидация номера телефона"""
-        try:
-            if not (self.phone.isdigit() and len(self.phone) == 11):
-                raise ValueError("Номер телефона должен содержать 11 цифр")
-            return True
-        except ValueError as e:
-            print(f"Ошибка валидации: {e}")
-            return False
-        finally:
-            print("Проверка телефона завершена")
-
-    def update_phone(self, new_phone):
-        """Метод для обновления номера телефона"""
-        try:
-            if not new_phone.isdigit():
-                raise ValueError("Номер должен содержать только цифры")
-            if len(new_phone) != 11:
-                raise ValueError("Номер должен содержать 11 цифр")
-                
-            self.phone = new_phone
-            print("Телефон успешно обновлен.")
-        except ValueError as e:
-            print(f"Ошибка обновления: {e}")
-
-    # Задание 4: Доступ к защищенному атрибуту в производном классе
-    def apply_discount(self, amount):
-        if 0 <= amount <= 30:
-            self._discount = amount
-            print(f"Скидка {amount}% применена")
-        else:
-            print("Недопустимый размер скидки")
+    def get_info(self) -> str:
+        return f"Клиент: {super().get_info()}, Телефон: {self.phone}"
+        
+    def calculate_cost(self, hours: int) -> float:
+        """Полиморфный метод - клиент может иметь стоимость (депозит)"""
+        return 1000 * hours  # Пример: депозит
 
 
 class Hall(PhotographicEntity):
     """Зал для фотосессии"""
-    
-    def __init__(self, number, price):
+    def __init__(self, number: int, price: float, capacity: int):
         self.number = number
         self.price = price
+        self.capacity = capacity
+        logger.info(f"Создан зал №{number}, цена: {price}, вместимость: {capacity}")
 
-    def get_info(self):
-        return f"Зал {self.number}, Цена: {self.price} руб/час"
-
-    def __add__(self, other):
-        """Перегрузка оператора сложения для увеличения цены"""
-        if isinstance(other, Hall):
-            return Hall(self.number, self.price + other.price)
-        return self
-
-    def __eq__(self, other):
-        """Перегрузка оператора сравнения залов"""
-        return self.number == other.number and self.price == other.price
+    def get_info(self) -> str:
+        return f"Зал {self.number}, Цена: {self.price} руб/час, Вместимость: {self.capacity} чел."
+    
+    def calculate_cost(self, hours: int) -> float:
+        """Полиморфный метод - расчет стоимости аренды зала"""
+        return self.price * hours
 
 
 class Equipment(PhotographicEntity):
     """Оборудование для съемки"""
+    def __init__(self, name: str, price: float):
+        self.name = name
+        self.price = price
+        logger.info(f"Создано оборудование: {name}, цена: {price}")
+
+    def get_info(self) -> str:
+        return f"Оборудование: {self.name}, Цена: {self.price} руб/час"
     
-    def __init__(self, lighting, backdrop, props):
-        self.lighting = lighting
-        self.backdrop = backdrop
-        self.props = props
-
-    def get_info(self):
-        return f"Свет: {self.lighting}, Фон: {self.backdrop}, Реквизит: {self.props}"
+    def calculate_cost(self, hours: int) -> float:
+        """Полиморфный метод - расчет стоимости аренды оборудования"""
+        return self.price * hours
 
 
+# ==================== Класс бронирования с лямбда-функциями ====================
 class Booking:
     """Бронирование фотостудии"""
-    
-    def __init__(self, client, hall, equipment, date, time, duration):
+    def __init__(self, client: Client, hall: Hall, equipment: List[Equipment], date: str, time: str, duration: int):
         self.client = client
         self.hall = hall
         self.equipment = equipment
         self.date = date
         self.time = time
         self.duration = duration
+        logger.info(f"Создано бронирование для {client.get_info()} на {date} {time}")
+
+    def calculate_total_cost(self) -> float:
+        """Расчет общей стоимости с использованием лямбда-функций"""
+        hall_cost = self.hall.calculate_cost(self.duration)
+        
+        # Лямбда для расчета стоимости оборудования
+        equipment_cost = sum(map(lambda e: e.calculate_cost(self.duration), self.equipment))
+        
+        # Лямбда для применения скидки клиента
+        apply_discount = lambda cost, discount: cost * (1 - discount/100)
+        
+        total = hall_cost + equipment_cost
+        return apply_discount(total, self.client._discount)
 
     def __str__(self):
-        return (f"Бронирование: {self.client}\nЗал: {self.hall}\n"
-                f"Оборудование: {self.equipment}\nДата: {self.date}, Время: {self.time}, Длительность: {self.duration} ч")
+        equipment_info = "\n".join([f"  - {eq.get_info()}" for eq in self.equipment])
+        return (f"Бронирование:\n"
+                f"Клиент: {self.client.get_info()}\n"
+                f"Зал: {self.hall.get_info()}\n"
+                f"Оборудование:\n{equipment_info}\n"
+                f"Дата: {self.date}, Время: {self.time}, Длительность: {self.duration} ч\n"
+                f"Общая стоимость: {self.calculate_total_cost():.2f} руб")
 
 
-# ==================== Задание 2: Работа с массивами объектов ====================
+# ==================== Класс студии с обработкой коллекций ====================
 class Studio:
     """Фотостудия для управления бронированиями"""
-    
-    total_bookings = 0  # Статическое поле для отслеживания всех бронирований
-
     def __init__(self):
-        self.bookings_by_date = defaultdict(list)  # Использование динамической структуры данных
-        self._halls = [[Hall(1, 2000), Hall(2, 3000)], 
-                      [Hall(3, 2500), Hall(4, 3500)]]  # Двумерный список залов
+        self.bookings: List[Booking] = []
+        self._halls: List[Hall] = [
+            Hall(1, 2000, 5),
+            Hall(2, 3000, 10),
+            Hall(3, 2500, 8)
+        ]
+        self._equipment: List[Equipment] = [
+            Equipment("Профессиональный свет", 500),
+            Equipment("Фон белый", 300),
+            Equipment("Фон черный", 300),
+            Equipment("Реквизит", 200)
+        ]
+        logger.info("Фотостудия инициализирована")
 
-    def add_booking(self, booking):
-        """Добавление бронирования с обработкой исключений"""
-        try:
-            if not booking.client.validate_phone():
-                raise BookingError("Неверный формат телефона клиента")
-                
-            if not self._is_hall_available(booking.hall, booking.date, booking.time):
-                raise HallNotAvailableError(booking.hall.number, booking.date, booking.time, "уже занят")
-                
-            self.bookings_by_date[booking.date].append(booking)
-            Studio.total_bookings += 1
-            print("Бронирование успешно добавлено!")
-            
-        except BookingError as e:
-            print(f"Ошибка бронирования: {e}")
-        except Exception as e:
-            print(f"Неожиданная ошибка: {e}")
-        finally:
-            print("=" * 40)
-
-    def _is_hall_available(self, hall, date, time):
-        """Проверка доступности зала (защищенный метод)"""
-        for booking in self.bookings_by_date.get(date, []):
-            if booking.hall == hall and booking.time == time:
-                return False
-        return True
-
-    def cancel_booking(self, client_name):
-        """Отмена бронирования по имени клиента"""
-        try:
-            found = False
-            for date, bookings in self.bookings_by_date.items():
-                original_count = len(bookings)
-                self.bookings_by_date[date] = [b for b in bookings if b.client._fname != client_name]
-                if len(self.bookings_by_date[date]) != original_count:
-                    found = True
-                    Studio.total_bookings -= (original_count - len(self.bookings_by_date[date]))
-            
-            if not found:
-                raise ClientNotFoundError(client_name, "отмене бронирования")
-                
-            print(f"Бронирование клиента {client_name} удалено.")
-            
-        except ClientNotFoundError as e:
-            print(f"Ошибка: {e}")
-        finally:
-            print("Операция отмены завершена")
-
-    def show_bookings(self):
-        """Вывод всех бронирований"""
-        if not self.bookings_by_date:
-            print("Нет активных бронирований.")
+    def add_booking(self, booking: Booking) -> bool:
+        """Добавление бронирования"""
+        # Лямбда для проверки доступности зала
+        is_hall_available = lambda: not any(
+            b for b in self.bookings 
+            if b.hall == booking.hall and b.date == booking.date and b.time == booking.time
+        )
+        
+        if is_hall_available():
+            self.bookings.append(booking)
+            logger.info(f"Бронирование добавлено: {booking}")
+            return True
         else:
-            for date, bookings in self.bookings_by_date.items():
-                print(f"Дата: {date}")
-                for booking in bookings:
-                    print(booking, "\n")
+            logger.warning(f"Зал {booking.hall.number} уже занят на {booking.date} {booking.time}")
+            return False
 
-    # Задание 2: Метод для поиска объекта с максимальным значением атрибута в двумерном списке
-    def find_max_price_hall(self):
-        """Находит зал с максимальной ценой в двумерном списке"""
-        try:
-            if not self._halls or all(not row for row in self._halls):
-                raise ValueError("Нет доступных залов")
-                
-            max_hall = None
-            for row in self._halls:
-                for hall in row:
-                    if max_hall is None or hall.price > max_hall.price:
-                        max_hall = hall
-            return max_hall
-            
-        except ValueError as e:
-            print(f"Ошибка: {e}")
-            return None
+    def filter_bookings(self, filter_func: Callable[[Booking], bool]) -> List[Booking]:
+        """Фильтрация бронирований с помощью лямбда-функции"""
+        return list(filter(filter_func, self.bookings))
 
-    @staticmethod
-    def get_total_bookings():
-        """Статический метод для получения общего числа бронирований"""
-        return Studio.total_bookings
+    def sort_bookings(self, key_func: Callable[[Booking], any]) -> List[Booking]:
+        """Сортировка бронирований с помощью лямбда-функции"""
+        return sorted(self.bookings, key=key_func)
+
+    def get_available_halls(self, date: str, time: str) -> List[Hall]:
+        """Получение доступных залов"""
+        # Лямбда для проверки занятости зала
+        is_hall_booked = lambda hall: any(
+            b for b in self.bookings 
+            if b.hall == hall and b.date == date and b.time == time
+        )
+        
+        return [hall for hall in self._halls if not is_hall_booked(hall)]
+
+    def get_equipment_by_filter(self, filter_func: Callable[[Equipment], bool]) -> List[Equipment]:
+        """Получение оборудования по фильтру"""
+        return list(filter(filter_func, self._equipment))
 
 
-# ==================== Пример работы системы ====================
+# ==================== Пример использования ====================
 if __name__ == "__main__":
-    print("=" * 40)
-    print("Демонстрация работы системы фотостудии")
-    print("=" * 40)
-    
-    # Создание объектов
     try:
-        client1 = Client("Анна", "Иванова", "89001234567")
-        client2 = Client("Иван", "Петров", "неверный_номер")
+        # Создание объектов
+        client1 = Client("Анна", "Иванова", "79001234567")
+        client2 = Client("Иван", "Петров", "79007654321")
         
-        # Задание 6: Проверка repr
-        print("\nПроверка repr:")
-        print(repr(client1))  # Должно вывести строку для воссоздания объекта
+        # Применение скидки
+        client1.apply_discount(10)
         
-        # Воссоздание объекта из repr
-        client1_copy = eval(repr(client1))
-        print(f"Воссозданный клиент: {client1_copy}")
+        # Создание студии
+        studio = Studio()
         
+        # Получение доступных залов
+        date = "2023-12-15"
+        time = "15:00"
+        available_halls = studio.get_available_halls(date, time)
+        print("Доступные залы:")
+        for hall in available_halls:
+            print(f" - {hall.get_info()}")
+        
+        # Создание бронирования
+        hall = available_halls[0]
+        equipment = studio.get_equipment_by_filter(lambda e: "свет" in e.name or "фон" in e.name)
+        booking1 = Booking(client1, hall, equipment, date, time, 3)
+        
+        # Добавление бронирования
+        if studio.add_booking(booking1):
+            print("\nБронирование успешно создано:")
+            print(booking1)
+        
+        # Попытка создать конфликтующее бронирование
+        booking2 = Booking(client2, hall, equipment, date, time, 2)
+        if not studio.add_booking(booking2):
+            print("\nОшибка: Зал уже занят в это время")
+        
+        # Фильтрация бронирований с помощью лямбда-функции
+        print("\nБронирования Анны Ивановой:")
+        annas_bookings = studio.filter_bookings(lambda b: b.client._fname == "Анна")
+        for b in annas_bookings:
+            print(b)
+        
+        # Сортировка бронирований по стоимости (лямбда-функция)
+        print("\nВсе бронирования, отсортированные по стоимости:")
+        sorted_bookings = studio.sort_bookings(lambda b: b.calculate_total_cost())
+        for b in sorted_bookings:
+            print(f"Стоимость: {b.calculate_total_cost():.2f} руб. - {b.client.get_info()}")
+        
+        # Демонстрация полиморфизма
+        print("\nДемонстрация полиморфизма:")
+        entities: List[PhotographicEntity] = [client1, hall, equipment[0]]
+        for entity in entities:
+            print(f"{entity.get_info()} - стоимость за 2 часа: {entity.calculate_cost(2):.2f} руб.")
+            
     except Exception as e:
-        print(f"Ошибка при создании клиентов: {e}")
-
-    hall1 = Hall(1, 2000)
-    hall2 = Hall(2, 3000)
-    equipment1 = Equipment("Профессиональный свет", "Белый фон", "Стул, цветы")
-
-    studio = Studio()
-
-    # Демонстрация работы с массивами объектов (Задание 2)
-    print("\nЗал с максимальной ценой:")
-    max_hall = studio.find_max_price_hall()
-    print(max_hall.get_info() if max_hall else "Нет залов")
-
-    # Демонстрация обработки исключений (Задание 1)
-    print("\nПопытка бронирования с неверным номером телефона:")
-    booking_bad = Booking(client2, hall1, equipment1, "10.02.2025", "15:00", 2)
-    studio.add_booking(booking_bad)
-
-    print("\nКорректное бронирование:")
-    booking1 = Booking(client1, hall1, equipment1, "10.02.2025", "15:00", 2)
-    studio.add_booking(booking1)
-
-    # Попытка повторного бронирования того же зала
-    print("\nПопытка повторного бронирования зала:")
-    booking2 = Booking(client1, hall1, equipment1, "10.02.2025", "15:00", 2)
-    studio.add_booking(booking2)
-
-    # Демонстрация наследования (Задание 3)
-    print("\nДемонстрация наследования:")
-    print(client1.full_greeting())  # Обычный клиент
-    print(client1.full_greeting(is_vip=True))  # VIP клиент
-
-    # Демонстрация работы с защищенными атрибутами (Задание 4)
-    print("\nРабота с защищенными атрибутами:")
-    client1.apply_discount(10)
-    try:
-        # Попытка доступа к защищенному атрибуту (не рекомендуется, но возможна)
-        print(f"Текущая скидка: {client1._discount}%")
-    except Exception as e:
-        print(f"Ошибка доступа: {e}")
-
-    # Вывод всех бронирований
-    print("\nТекущие бронирования:")
-    studio.show_bookings()
-
-    # Отмена бронирования
-    print("\nОтмена бронирования:")
-    studio.cancel_booking("Анна")
-    studio.show_bookings()
-
-    print(f"\nВсего бронирований: {Studio.get_total_bookings()}")
+        logger.critical(f"Критическая ошибка: {str(e)}", exc_ientities nfo=True)
+        print(f"Произошла ошибка: {e}")
